@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "auth"
+name = "kytool"
 version = "0.1.0"
-description = "Kyto service"
-authors = ["Name Surname <author@example.com>"]
+description = "Kytool is a tool for creatng"
+authors = ["Dmytro Maior <mayor4090@gmail.com>"]
 readme = "README.md"
 packages = [
     {include = "src", from = "."},
