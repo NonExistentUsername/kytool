@@ -4,7 +4,7 @@ import logging
 import multiprocessing.pool
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Type, Union
 
-from src.domain import commands, events, exceptions
+from kytool.domain import commands, events, exceptions
 
 if TYPE_CHECKING:
     from . import unit_of_work

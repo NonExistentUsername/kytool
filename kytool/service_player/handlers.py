@@ -1,6 +1,6 @@
 from typing import Callable, Dict, List, Type, Union
 
-from src.domain import commands, events
+from kytool.domain import commands, events
 
 EVENT_HANDLERS: Dict[Type[events.Event], List[Callable]] = {}
 COMMAND_HANDLERS: Dict[Type[commands.Command], Callable] = {}

@@ -2,8 +2,8 @@ import contextlib
 
 import pytest
 
-from src.adapters import repository
-from src.service_player import unit_of_work
+from kytool.adapters import repository
+from kytool.service_player import unit_of_work
 
 
 class SampleObject:

@@ -5,8 +5,9 @@ description = "Kytool is a tool for creatng"
 authors = ["Dmytro Maior <mayor4090@gmail.com>"]
 readme = "README.md"
 packages = [
-    {include = "src", from = "."},
+    {include = "kytool"},
 ]
+license = "Apache-2.0"
 
 [tool.poetry.dependencies]
 python = "^3.11"

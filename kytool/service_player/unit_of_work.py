@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.adapters import repository
+    from kytool.adapters import repository
 
 logger = logging.getLogger(__name__)
 

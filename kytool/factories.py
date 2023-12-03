@@ -1,9 +1,9 @@
 from typing import Callable, List, Type
 
-from src import di
-from src.adapters import repository
-from src.domain import commands, events
-from src.service_player import handlers, messagebus, unit_of_work
+from kytool import di
+from kytool.adapters import repository
+from kytool.domain import commands, events
+from kytool.service_player import handlers, messagebus, unit_of_work
 
 
 def create_uow(uow_type: str) -> unit_of_work.AbstractUnitOfWork:

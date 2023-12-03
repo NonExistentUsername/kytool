@@ -4,7 +4,7 @@ import abc
 from copy import deepcopy
 from typing import Dict, Generic, List, Optional, TypeVar
 
-from src.domain.base import BaseModel
+from kytool.domain.base import BaseModel
 
 _T = TypeVar("_T", bound=BaseModel)
 
