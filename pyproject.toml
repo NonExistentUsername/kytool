@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kytool"
-version = "0.2.0"
+version = "0.2.1"
 description = "Kytool is a tool for creatng"
 authors = ["Dmytro Maior <mayor4090@gmail.com>"]
 readme = "README.md"
