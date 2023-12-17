@@ -131,3 +131,22 @@ class TestMessageBus:
         assert instance.name == "test"
 
         assert bus.uow.r("users").get(id=instance.id) is None
+
+    def test_force_background(self, bus: messagebus.MessageBus):
+        instance: User = bus.handle(CreateUserCommand(name="test"))
+
+        assert instance.id is not None
+        assert instance.name == "test"
+
+        assert bus.uow.r("users").get(id=instance.id) == instance
+
+        async_task = bus.handle(
+            DeleteUserCommand(user_id=instance.id), force_background=True
+        )
+        instance = async_task.get()
+
+        assert instance is not None
+
+        time.sleep(0.01)
+
+        assert bus.uow.r("users").get(id=instance.id) is None

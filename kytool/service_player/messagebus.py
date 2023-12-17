@@ -51,7 +51,7 @@ to use for handling messages. Defaults to 1.
         self.command_handlers: Dict[Type[commands.Command], Callable] = command_handlers
         self.pool = multiprocessing.pool.ThreadPool(background_threads)
 
-    def handle(self, message: Message) -> Any:
+    def handle(self, message: Message, force_background=False) -> Any:
         """
         Handle message
 
@@ -66,6 +66,9 @@ to use for handling messages. Defaults to 1.
             return None
 
         if isinstance(message, commands.Command):
+            if force_background:
+                return self.pool.apply_async(self._handle_command, (message,))
+
             return self._handle_command(message)
 
         raise ValueError(f"{message} is not Event or Command")
