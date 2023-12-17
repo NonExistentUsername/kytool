@@ -137,4 +137,4 @@ class InMemoryUnitOfWork(AbstractUnitOfWork):
 
         logger.debug("Rolling back changes in InMemoryUnitOfWork")
 
-        self.repositories = deepcopy(self._last_committed)
+        self.repositories = self._last_committed
