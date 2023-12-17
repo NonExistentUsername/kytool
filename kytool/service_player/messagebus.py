@@ -72,6 +72,23 @@ to use for handling messages. Defaults to 1.
         for event in self.uow.collect_new_events():
             self.handle(event)
 
+    def _handle_with_profiling(self, message: Message) -> Any:
+        """
+        Handle message with profiling
+
+        Args:
+            message (Message): Message to handle. It can be either Event or Command
+        """
+        import cProfile
+
+        pr = cProfile.Profile()
+        pr.enable()
+        result = self._handle(message)
+        pr.disable()
+        pr.print_stats(sort="time")
+
+        return result
+
     def _handle(self, message: Message) -> Any:
         """
         Handle message
@@ -83,74 +100,59 @@ to use for handling messages. Defaults to 1.
             Any: Result of handling message
         """
 
-        result = None
-        for handler in self._get_handlers(message):
-            result = handler(message)
+        if isinstance(message, commands.Command):
+            return self._handle_command(message)
+
+        return self._handle_event(message)
+
+    def _handle_command(self, command: commands.Command) -> Any:
+        """
+        Handles a command by invoking the corresponding command handler.
+
+        Args:
+            command (commands.Command): The command to be handled.
+
+        Returns:
+            Any: The result of handling the command.
+
+        """
+        handler = self.command_handlers[type(command)]
+
+        result = self._try_process(handler, command)
 
         self.pool.apply_async(self._collect_new_events)
 
-        if isinstance(message, commands.Command):
-            return result
+        return result
 
-    def _get_handlers(self, message: Message) -> list[Callable]:
+    def _handle_event(self, event: events.Event) -> None:
         """
-        Get handlers for message
+        Handles an event by invoking the corresponding event handler.
 
         Args:
-            message (Message): Message to get handlers for
+            event (events.Event): The event to be handled.
 
-        Raises:
-            ValueError: If message is not Event or Command
-
-        Returns:
-            list[Callable]: List of handlers
         """
 
-        if isinstance(message, commands.Command):
-            return self._get_command_handlers(message)
-        elif isinstance(message, events.Event):
-            return self._get_event_handlers(message)
+        for handler in self.event_handlers[type(event)]:
+            self._try_process(handler, event)
 
-        raise ValueError(f"Unexpected message {message}")
+        self._collect_new_events()
 
-    def _get_command_handlers(self, command: commands.Command) -> List[Callable]:
+    @staticmethod
+    def _try_process(func: Callable, message: Message) -> Any:
         """
-        Get command handlers for command
+        Tries to process a message using the provided function.
 
         Args:
-            command (commands.Command): Command to get handlers for
+            func (Callable): The function to be called with the message.
+            message (Message): The message to be processed.
 
         Returns:
-            List[Callable]: List of handlers
-        """
-
-        return [self.command_handlers[type(command)]]  # type: ignore
-
-    def _get_event_handlers(self, event: events.Event) -> List[Callable]:
-        """
-        Get event handlers for event
-
-        Args:
-            event (events.Event): Event to get handlers for
-
-        Returns:
-            List[Callable]: List of handlers
-        """
-        return self.event_handlers[type(event)]  # type: ignore
-
-    def _try_process(self, func: Callable) -> Any:
-        """
-        Try to process function and catch exceptions
-
-        Args:
-            func (Callable): Function to process
-
-        Returns:
-            Any: Result of processing function
+            Any: The result of processing the message with the function.
         """
 
         try:
-            return func()
+            return func(message)
         except exceptions.InternalException as e:
             logger.debug(
                 f"Exception processing {func}"
