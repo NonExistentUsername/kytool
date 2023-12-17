@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [
     {include = "kytool"},
 ]
-license = "Apache-2.0"
+license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.11"
