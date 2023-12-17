@@ -4,7 +4,7 @@ import logging
 import multiprocessing.pool
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Type, Union
 
-from kytool.domain import commands, events, exceptions
+from kytool.domain import commands, events
 
 if TYPE_CHECKING:
     from . import unit_of_work
@@ -51,7 +51,7 @@ to use for handling messages. Defaults to 1.
         self.command_handlers: Dict[Type[commands.Command], Callable] = command_handlers
         self.pool = multiprocessing.pool.ThreadPool(background_threads)
 
-    def handle(self, message: Message) -> multiprocessing.pool.AsyncResult:
+    def handle(self, message: Message) -> Any:
         """
         Handle message
 
@@ -61,8 +61,14 @@ to use for handling messages. Defaults to 1.
         Raises:
             ValueError: If message is not Event or Command
         """
+        if isinstance(message, events.Event):
+            self.pool.apply_async(self._handle_event, (message,))
+            return None
 
-        return self.pool.apply_async(self._handle, (message,))
+        if isinstance(message, commands.Command):
+            return self._handle_command(message)
+
+        raise ValueError(f"{message} is not Event or Command")
 
     def _collect_new_events(self) -> None:
         """

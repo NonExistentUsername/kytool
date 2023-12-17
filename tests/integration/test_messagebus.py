@@ -96,8 +96,7 @@ def bus(uow: unit_of_work.AbstractUnitOfWork) -> messagebus.MessageBus:
 
 class TestMessageBus:
     def test_command(self, bus: messagebus.MessageBus):
-        task = bus.handle(CreateUserCommand(name="test"))
-        instance: User = task.get()
+        instance: User = bus.handle(CreateUserCommand(name="test"))
 
         assert instance.id is not None
         assert instance.name == "test"
@@ -106,6 +105,9 @@ class TestMessageBus:
 
     def test_event(self, bus: messagebus.MessageBus):
         event = UserCreatedEvent(user_id=str(uuid4()), name="test")
+
+        assert isinstance(event, events.Event)
+
         bus.handle(event)
 
         time.sleep(0.01)
@@ -116,16 +118,14 @@ class TestMessageBus:
         assert instance.name == "testcopy"
 
     def test_command_handler(self, bus: messagebus.MessageBus):
-        task = bus.handle(CreateUserCommand(name="test"))
-        instance: User = task.get()
+        instance: User = bus.handle(CreateUserCommand(name="test"))
 
         assert instance.id is not None
         assert instance.name == "test"
 
         assert bus.uow.r("users").get(id=instance.id) == instance
 
-        task = bus.handle(DeleteUserCommand(user_id=instance.id))
-        instance = task.get()
+        instance = bus.handle(DeleteUserCommand(user_id=instance.id))
 
         assert instance.id is not None
         assert instance.name == "test"
