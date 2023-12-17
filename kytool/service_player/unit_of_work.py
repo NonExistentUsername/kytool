@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import logging
 from copy import deepcopy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
     from kytool.adapters import repository
@@ -16,20 +16,17 @@ class AbstractUnitOfWork(abc.ABC):
     Abstract class for Unit of Work
     """
 
-    users: repository.AbstractRepository
-
     def __init__(
         self,
-        users: repository.AbstractRepository,
+        repositories: Dict[str, repository.AbstractRepository],
     ):
         """
-        Initialize Unit of Work
+        Initializes a UnitOfWork object.
 
         Args:
-            repositories (repository.AbstractRepository): Users repository
+            repositories (Dict[str, repository.AbstractRepository]): A dictionary of repository objects.
         """
-
-        self.users = users
+        self.repositories: Dict[str, repository.AbstractRepository] = repositories
 
     def __enter__(self) -> AbstractUnitOfWork:
         """
@@ -55,18 +52,31 @@ class AbstractUnitOfWork(abc.ABC):
 
         self._commit()
 
+    def r(self, key: str) -> repository.AbstractRepository:
+        """
+        Get repository
+
+        Args:
+            key (str): Repository key
+
+        Returns:
+            repository.AbstractRepository: Repository
+        """
+
+        return self.repositories[key]
+
     def collect_new_events(self):
         """
-        Collect all new events from all instances in the repository
+        Collects new events from the repositories.
 
         Yields:
-            Event: New event
+            Any: The new events collected from the repositories.
         """
-
-        for instance in self.users.seen:
-            if hasattr(instance, "events") and isinstance(instance.events, list):
-                while instance.events:
-                    yield instance.events.pop(0)
+        for repository in self.repositories.values():
+            for instance in repository.seen:
+                if hasattr(instance, "events") and isinstance(instance.events, list):
+                    while instance.events:
+                        yield instance.events.pop(0)
 
     @abc.abstractmethod
     def _commit(self):
@@ -98,7 +108,7 @@ class InMemoryUnitOfWork(AbstractUnitOfWork):
 
     def __init__(
         self,
-        users: repository.AbstractRepository,
+        repositories: Dict[str, repository.AbstractRepository],
     ):
         """
         Initialize InMemoryUnitOfWork
@@ -107,9 +117,9 @@ class InMemoryUnitOfWork(AbstractUnitOfWork):
             users (repository.AbstractRepository): Users repository
         """
 
-        super().__init__(users)
+        super().__init__(repositories=repositories)
 
-        self._last_committed_users = deepcopy(users)
+        self._last_committed = deepcopy(self.repositories)
 
     def _commit(self):
         """
@@ -118,7 +128,7 @@ class InMemoryUnitOfWork(AbstractUnitOfWork):
 
         logger.debug("Commiting changes in InMemoryUnitOfWork")
 
-        self._last_committed_users = deepcopy(self.users)
+        self._last_committed = deepcopy(self.repositories)
 
     def rollback(self):
         """
@@ -127,4 +137,4 @@ class InMemoryUnitOfWork(AbstractUnitOfWork):
 
         logger.debug("Rolling back changes in InMemoryUnitOfWork")
 
-        self.users = deepcopy(self._last_committed_users)
+        self.repositories = deepcopy(self._last_committed)

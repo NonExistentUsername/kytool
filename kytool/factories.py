@@ -9,7 +9,11 @@ from kytool.service_player import handlers, messagebus, unit_of_work
 def create_uow(uow_type: str) -> unit_of_work.AbstractUnitOfWork:
     if uow_type == "ram":
         return unit_of_work.InMemoryUnitOfWork(
-            repository.InMemoryRepository(query_fields=["id", "username", "email"])
+            {
+                "default": repository.InMemoryRepository(
+                    query_fields=["id", "username", "email"]
+                )
+            }
         )
 
     raise ValueError(f"Unknown uow_type: {uow_type}")
@@ -21,6 +25,7 @@ def create_message_bus(
     command_handlers: dict[
         Type[commands.Command], Callable
     ] = handlers.COMMAND_HANDLERS,
+    background_threads: int = 1,
 ) -> messagebus.MessageBus:
     """
     Create message bus
@@ -51,4 +56,5 @@ def create_message_bus(
         uow=uow,
         event_handlers=injected_event_handlers,
         command_handlers=injected_command_handlers,
+        background_threads=background_threads,
     )

@@ -28,36 +28,36 @@ class SampleObject:
 @pytest.fixture
 def uow() -> unit_of_work.AbstractUnitOfWork:
     return unit_of_work.InMemoryUnitOfWork(
-        users=repository.InMemoryRepository(query_fields=["id"]),
+        repositories=dict(users=repository.InMemoryRepository(query_fields=["id"]))
     )
 
 
 class TestRamUOWCreation:
     def test_works(self, uow: unit_of_work.AbstractUnitOfWork):
         with uow:
-            uow.users.add(SampleObject(id="123", name="test"))
+            uow.r("users").add(SampleObject(id="123", name="test"))
             uow.commit()
 
-        assert uow.users.get(id="123") == SampleObject(id="123", name="test")
+        assert uow.r("users").get(id="123") == SampleObject(id="123", name="test")
 
         with uow:
-            instance = uow.users.delete(id="123")
+            instance = uow.r("users").delete(id="123")
             uow.commit()
 
             assert instance == SampleObject(id="123", name="test")
 
-        assert uow.users.get(id="123") is None
+        assert uow.r("users").get(id="123") is None
 
     def test_rolls_back(self, uow: unit_of_work.AbstractUnitOfWork):
         with uow:
-            uow.users.add(SampleObject(id="123", name="test"))
+            uow.r("users").add(SampleObject(id="123", name="test"))
 
-        assert uow.users.get(id="123") is None
+        assert uow.r("users").get(id="123") is None
 
     def test_rolls_back_if_exception(self, uow: unit_of_work.AbstractUnitOfWork):
         with contextlib.suppress(Exception):
             with uow:
-                uow.users.add(SampleObject(id="123", name="test"))
+                uow.r("users").add(SampleObject(id="123", name="test"))
                 raise ValueError("test")
 
-        assert uow.users.get(id="123") is None
+        assert uow.r("users").get(id="123") is None

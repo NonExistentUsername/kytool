@@ -1,0 +1,133 @@
+import time
+from uuid import uuid4
+
+import pytest
+
+from kytool import factories
+from kytool.adapters import repository
+from kytool.domain import base, commands, events
+from kytool.service_player import handlers, messagebus, unit_of_work
+
+
+class User(base.BaseModel):
+    name: str
+
+    def __init__(self, id: str, name: str):
+        super().__init__(id=id)
+        self.name = name
+
+    def __eq__(self, other):
+        return self.id == other.id and self.name == other.name
+
+    def __hash__(self) -> int:
+        return super().__hash__()
+
+
+class CreateUserCommand(commands.Command):
+    name: str
+
+    def __init__(self, name: str):
+        super().__init__()
+        self.name = name
+
+
+class DeleteUserCommand(commands.Command):
+    user_id: str
+
+    def __init__(self, user_id: str):
+        super().__init__()
+        self.user_id = user_id
+
+
+class UserCreatedEvent(events.Event):
+    user_id: str
+    name: str
+
+    def __init__(self, user_id: str, name: str):
+        super().__init__()
+        self.user_id = user_id
+        self.name = name
+
+
+@handlers.register_handler(CreateUserCommand)
+def create_user_handler(
+    command: CreateUserCommand, uow: unit_of_work.AbstractUnitOfWork
+):
+    with uow:
+        instance = User(id=str(uuid4()), name=command.name)
+        uow.r("users").add(instance=instance)
+        uow.commit()
+
+        return instance
+
+
+@handlers.register_handler(DeleteUserCommand)
+def delete_user_handler(
+    command: DeleteUserCommand, uow: unit_of_work.AbstractUnitOfWork
+):
+    with uow:
+        instance = uow.r("users").delete(id=command.user_id)
+        uow.commit()
+
+        return instance
+
+
+@handlers.register_handler(UserCreatedEvent)
+def user_created_handler(event: UserCreatedEvent, uow: unit_of_work.AbstractUnitOfWork):
+    with uow:
+        instance = User(id=event.user_id, name=f"{event.name}copy")
+        uow.r("users").add(instance=instance)
+        uow.commit()
+
+        return instance
+
+
+@pytest.fixture
+def uow() -> unit_of_work.AbstractUnitOfWork:
+    return unit_of_work.InMemoryUnitOfWork(
+        repositories=dict(users=repository.InMemoryRepository(query_fields=["id"]))
+    )
+
+
+@pytest.fixture
+def bus(uow: unit_of_work.AbstractUnitOfWork) -> messagebus.MessageBus:
+    return factories.create_message_bus(uow=uow)
+
+
+class TestMessageBus:
+    def test_command(self, bus: messagebus.MessageBus):
+        task = bus.handle(CreateUserCommand(name="test"))
+        instance: User = task.get()
+
+        assert instance.id is not None
+        assert instance.name == "test"
+
+        assert bus.uow.r("users").get(id=instance.id) == instance
+
+    def test_event(self, bus: messagebus.MessageBus):
+        event = UserCreatedEvent(user_id=str(uuid4()), name="test")
+        bus.handle(event)
+
+        time.sleep(0.01)
+
+        instance: User = bus.uow.r("users").get(id=event.user_id)  # type: ignore
+
+        assert instance.id == event.user_id
+        assert instance.name == "testcopy"
+
+    def test_command_handler(self, bus: messagebus.MessageBus):
+        task = bus.handle(CreateUserCommand(name="test"))
+        instance: User = task.get()
+
+        assert instance.id is not None
+        assert instance.name == "test"
+
+        assert bus.uow.r("users").get(id=instance.id) == instance
+
+        task = bus.handle(DeleteUserCommand(user_id=instance.id))
+        instance = task.get()
+
+        assert instance.id is not None
+        assert instance.name == "test"
+
+        assert bus.uow.r("users").get(id=instance.id) is None
