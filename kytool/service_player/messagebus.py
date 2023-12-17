@@ -118,7 +118,7 @@ to use for handling messages. Defaults to 1.
         """
         handler = self.command_handlers[type(command)]
 
-        result = self._try_process(handler, command)
+        result = handler(command)
 
         self.pool.apply_async(self._collect_new_events)
 
@@ -134,30 +134,6 @@ to use for handling messages. Defaults to 1.
         """
 
         for handler in self.event_handlers[type(event)]:
-            self._try_process(handler, event)
+            handler(event)
 
         self._collect_new_events()
-
-    @staticmethod
-    def _try_process(func: Callable, message: Message) -> Any:
-        """
-        Tries to process a message using the provided function.
-
-        Args:
-            func (Callable): The function to be called with the message.
-            message (Message): The message to be processed.
-
-        Returns:
-            Any: The result of processing the message with the function.
-        """
-
-        try:
-            return func(message)
-        except exceptions.InternalException as e:
-            logger.debug(
-                f"Exception processing {func}"
-            )  # Do not log internal exceptions as they are expected
-            return e
-        except Exception as e:
-            logger.exception(f"Exception processing {func}")  # Log other exceptions
-            return e
