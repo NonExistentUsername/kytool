@@ -16,18 +16,6 @@ class AbstractUnitOfWork(abc.ABC):
     Abstract class for Unit of Work
     """
 
-    def __init__(
-        self,
-        repositories: Dict[str, repository.AbstractRepository],
-    ):
-        """
-        Initializes a UnitOfWork object.
-
-        Args:
-            repositories (Dict[str, repository.AbstractRepository]): A dictionary of repository objects.
-        """
-        self.repositories: Dict[str, repository.AbstractRepository] = repositories
-
     def __enter__(self) -> AbstractUnitOfWork:
         """
         Enter Unit of Work
@@ -52,19 +40,7 @@ class AbstractUnitOfWork(abc.ABC):
 
         self._commit()
 
-    def r(self, key: str) -> repository.AbstractRepository:
-        """
-        Get repository
-
-        Args:
-            key (str): Repository key
-
-        Returns:
-            repository.AbstractRepository: Repository
-        """
-
-        return self.repositories[key]
-
+    @abc.abstractmethod
     def collect_new_events(self):
         """
         Collects new events from the repositories.
@@ -72,11 +48,8 @@ class AbstractUnitOfWork(abc.ABC):
         Yields:
             Any: The new events collected from the repositories.
         """
-        for repository in self.repositories.values():
-            for instance in repository.seen:
-                if hasattr(instance, "events") and isinstance(instance.events, list):
-                    while instance.events:
-                        yield instance.events.pop(0)
+
+        raise NotImplementedError
 
     @abc.abstractmethod
     def _commit(self):
@@ -101,7 +74,50 @@ class AbstractUnitOfWork(abc.ABC):
         raise NotImplementedError
 
 
-class InMemoryUnitOfWork(AbstractUnitOfWork):
+class BaseRepositoriesUnitOfWork(AbstractUnitOfWork):
+    """
+    Base Unit of Work that does nothing
+    """
+
+    def __init__(self, repositories: Dict[str, repository.AbstractRepository]):
+        super().__init__()
+        self.repositories = repositories
+
+    def r(self, key: str) -> repository.AbstractRepository:
+        """
+        Get repository
+
+        Args:
+            key (str): Repository key
+
+        Returns:
+            repository.AbstractRepository: Repository
+        """
+
+        return self.repositories[key]
+
+    def rollback(self):
+        """
+        Rollback all changes made in this unit of work
+        """
+
+        pass
+
+    def collect_new_events(self):
+        """
+        Collects new events from the repositories.
+
+        Yields:
+            Any: The new events collected from the repositories.
+        """
+        for repository in self.repositories.values():
+            for instance in repository.seen:
+                if hasattr(instance, "events") and isinstance(instance.events, list):
+                    while instance.events:
+                        yield instance.events.pop(0)
+
+
+class InMemoryUnitOfWork(BaseRepositoriesUnitOfWork):
     """
     Unit of Work that stores all changes in RAM
     """
