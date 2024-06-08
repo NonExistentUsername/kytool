@@ -2,9 +2,20 @@ from __future__ import annotations
 
 import logging
 import multiprocessing.pool
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Type,
+    TypeVar,
+    Union,
+)
 
 from kytool.domain import commands, events
+from kytool.service_player.unit_of_work import AbstractUnitOfWork
 
 if TYPE_CHECKING:
     from . import unit_of_work
@@ -12,14 +23,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 Message = Union[commands.Command, events.Event]
+_UOW = TypeVar("_UOW", bound=AbstractUnitOfWork)
 
 
-class MessageBus:
+class MessageBus(Generic[_UOW]):
     """
     A message bus that handles messages, which can be either events or commands.
 
     Args:
-        uow (unit_of_work.AbstractUnitOfWork): The unit of work to \
+        uow (_UOW): The unit of work to \
 use for handling messages.
         event_handlers (Dict[events.Event, list[Callable]]): A dictionary mapping \
 events to their handlers.
@@ -31,7 +43,7 @@ to use for handling messages. Defaults to 1.
 
     def __init__(
         self,
-        uow: unit_of_work.AbstractUnitOfWork,
+        uow: _UOW,
         event_handlers: Dict[Type[events.Event], list[Callable]],
         command_handlers: Dict[Type[commands.Command], Callable],
         background_threads: int = 1,
@@ -40,13 +52,13 @@ to use for handling messages. Defaults to 1.
         Initialize message bus
 
         Args:
-            uow (unit_of_work.AbstractUnitOfWork): _description_
+            uow (_UOW): _description_
             event_handlers (Dict[events.Event, list[Callable]]): _description_
             command_handlers (Dict[commands.Command, Callable]): _description_
             background_threads (int, optional): _description_. Defaults to 1.
         """
 
-        self.uow: unit_of_work.AbstractUnitOfWork = uow
+        self.uow: _UOW = uow
         self.event_handlers: Dict[Type[events.Event], list[Callable]] = event_handlers
         self.command_handlers: Dict[Type[commands.Command], Callable] = command_handlers
         self.pool = multiprocessing.pool.ThreadPool(background_threads)

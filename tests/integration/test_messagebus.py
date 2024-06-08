@@ -51,7 +51,7 @@ class UserCreatedEvent(events.Event):
 
 @handlers.register_handler(CreateUserCommand)
 def create_user_handler(
-    command: CreateUserCommand, uow: unit_of_work.AbstractUnitOfWork
+    command: CreateUserCommand, uow: unit_of_work.BaseRepositoriesUnitOfWork
 ):
     with uow:
         instance = User(id=str(uuid4()), name=command.name)
@@ -63,7 +63,7 @@ def create_user_handler(
 
 @handlers.register_handler(DeleteUserCommand)
 def delete_user_handler(
-    command: DeleteUserCommand, uow: unit_of_work.AbstractUnitOfWork
+    command: DeleteUserCommand, uow: unit_of_work.BaseRepositoriesUnitOfWork
 ):
     with uow:
         instance = uow.r("users").delete(id=command.user_id)
@@ -73,7 +73,9 @@ def delete_user_handler(
 
 
 @handlers.register_handler(UserCreatedEvent)
-def user_created_handler(event: UserCreatedEvent, uow: unit_of_work.AbstractUnitOfWork):
+def user_created_handler(
+    event: UserCreatedEvent, uow: unit_of_work.BaseRepositoriesUnitOfWork
+):
     with uow:
         instance = User(id=event.user_id, name=f"{event.name}copy")
         uow.r("users").add(instance=instance)
@@ -83,19 +85,22 @@ def user_created_handler(event: UserCreatedEvent, uow: unit_of_work.AbstractUnit
 
 
 @pytest.fixture
-def uow() -> unit_of_work.AbstractUnitOfWork:
+def uow() -> unit_of_work.BaseRepositoriesUnitOfWork:
     return unit_of_work.InMemoryUnitOfWork(
         repositories=dict(users=repository.InMemoryRepository(query_fields=["id"]))
     )
 
 
 @pytest.fixture
-def bus(uow: unit_of_work.AbstractUnitOfWork) -> messagebus.MessageBus:
+def bus(uow: unit_of_work.BaseRepositoriesUnitOfWork) -> messagebus.MessageBus:
     return factories.create_message_bus(uow=uow)
 
 
 class TestMessageBus:
-    def test_command(self, bus: messagebus.MessageBus):
+    def test_command(
+        self,
+        bus: messagebus.MessageBus[unit_of_work.BaseRepositoriesUnitOfWork],
+    ):
         instance: User = bus.handle(CreateUserCommand(name="test"))
 
         assert instance.id is not None
@@ -103,7 +108,9 @@ class TestMessageBus:
 
         assert bus.uow.r("users").get(id=instance.id) == instance
 
-    def test_event(self, bus: messagebus.MessageBus):
+    def test_event(
+        self, bus: messagebus.MessageBus[unit_of_work.BaseRepositoriesUnitOfWork]
+    ):
         event = UserCreatedEvent(user_id=str(uuid4()), name="test")
 
         assert isinstance(event, events.Event)
@@ -117,7 +124,9 @@ class TestMessageBus:
         assert instance.id == event.user_id
         assert instance.name == "testcopy"
 
-    def test_command_handler(self, bus: messagebus.MessageBus):
+    def test_command_handler(
+        self, bus: messagebus.MessageBus[unit_of_work.BaseRepositoriesUnitOfWork]
+    ):
         instance: User = bus.handle(CreateUserCommand(name="test"))
 
         assert instance.id is not None
@@ -132,7 +141,9 @@ class TestMessageBus:
 
         assert bus.uow.r("users").get(id=instance.id) is None
 
-    def test_force_background(self, bus: messagebus.MessageBus):
+    def test_force_background(
+        self, bus: messagebus.MessageBus[unit_of_work.BaseRepositoriesUnitOfWork]
+    ):
         instance: User = bus.handle(CreateUserCommand(name="test"))
 
         assert instance.id is not None
