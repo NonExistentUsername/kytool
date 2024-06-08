@@ -13,22 +13,8 @@ class BaseModel:
         events (list[Event]): A list of events associated with the model.
     """
 
-    def __init__(self, id: str):
+    def __init__(self):
         """
         Initializes a new instance of the Base class.
-
-        Args:
-            id (str): The unique identifier for the Base.
         """
-        self.__id = id
         self.events: list[Event] = []
-
-    @property
-    def id(self) -> str:
-        """
-        Getter for id
-
-        Returns:
-            str: id
-        """
-        return self.__id
