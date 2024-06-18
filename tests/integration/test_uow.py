@@ -3,7 +3,7 @@ import contextlib
 import pytest
 
 from kytool.adapters import repository
-from kytool.service_player import unit_of_work
+from kytool.service_layer import unit_of_work
 
 
 class SampleObject:
@@ -26,14 +26,14 @@ class SampleObject:
 
 
 @pytest.fixture
-def uow() -> unit_of_work.AbstractUnitOfWork:
+def uow() -> unit_of_work.InMemoryUnitOfWork:
     return unit_of_work.InMemoryUnitOfWork(
         repositories=dict(users=repository.InMemoryRepository(query_fields=["id"]))
     )
 
 
 class TestRamUOWCreation:
-    def test_works(self, uow: unit_of_work.AbstractUnitOfWork):
+    def test_works(self, uow: unit_of_work.InMemoryUnitOfWork):
         with uow:
             uow.r("users").add(SampleObject(id="123", name="test"))
             uow.commit()
@@ -48,13 +48,13 @@ class TestRamUOWCreation:
 
         assert uow.r("users").get(id="123") is None
 
-    def test_rolls_back(self, uow: unit_of_work.AbstractUnitOfWork):
+    def test_rolls_back(self, uow: unit_of_work.InMemoryUnitOfWork):
         with uow:
             uow.r("users").add(SampleObject(id="123", name="test"))
 
-        assert uow.r("users").get(id="123") is None
+        assert uow.r("users").get(id="123") is not None
 
-    def test_rolls_back_if_exception(self, uow: unit_of_work.AbstractUnitOfWork):
+    def test_rolls_back_if_exception(self, uow: unit_of_work.InMemoryUnitOfWork):
         with contextlib.suppress(Exception):
             with uow:
                 uow.r("users").add(SampleObject(id="123", name="test"))

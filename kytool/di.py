@@ -1,6 +1,8 @@
 import inspect
 from typing import Any, Callable
 
+import decorator  # type: ignore
+
 
 def inject_dependencies(handler: Callable, dependencies: dict[str, Any]) -> Callable:
     """
@@ -18,4 +20,10 @@ def inject_dependencies(handler: Callable, dependencies: dict[str, Any]) -> Call
     deps = {
         name: dependency for name, dependency in dependencies.items() if name in params
     }
-    return lambda message: handler(message, **deps)
+
+    # build a function with same signature as handler, but with dependencies added
+    @decorator.decorator
+    def wrapper(func, *args, **kwargs):
+        return func(*args, **kwargs, **deps)
+
+    return wrapper(handler)

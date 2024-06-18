@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 import multiprocessing.pool
 from typing import (
@@ -8,14 +9,15 @@ from typing import (
     Callable,
     Dict,
     Generic,
-    List,
+    Optional,
+    Tuple,
     Type,
     TypeVar,
     Union,
 )
 
 from kytool.domain import commands, events
-from kytool.service_player.unit_of_work import AbstractUnitOfWork
+from kytool.service_layer.unit_of_work import AbstractUnitOfWork, AbstractUnitOfWorkPool
 
 if TYPE_CHECKING:
     from . import unit_of_work
@@ -23,27 +25,48 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 Message = Union[commands.Command, events.Event]
-_UOW = TypeVar("_UOW", bound=AbstractUnitOfWork)
+_UOW = TypeVar("_UOW", bound=AbstractUnitOfWorkPool)
 
 
 class MessageBus(Generic[_UOW]):
     """
     A message bus that handles messages, which can be either events or commands.
-
-    Args:
-        uow (_UOW): The unit of work to \
-use for handling messages.
-        event_handlers (Dict[events.Event, list[Callable]]): A dictionary mapping \
-events to their handlers.
-        command_handlers (Dict[commands.Command, Callable]): A dictionary mapping \
-commands to their handlers.
-        background_threads (int, optional): The number of background threads \
-to use for handling messages. Defaults to 1.
     """
+
+    def _inject_uow(self, handler: Callable) -> Callable:
+        def wrapper(message: Message) -> Any:
+            uow = self.uow_pool.get()
+            result = handler(message, uow=uow)
+            return uow, result
+
+        if inspect.signature(handler).parameters.get("uow"):
+            print("Injecting UOW")
+            return wrapper
+        else:
+            print("Not injecting UOW")
+            return lambda message: (None, handler(message))
+
+    def _get_injected_command_handlers(
+        self, command_handlers: Dict[Type[commands.Command], Callable]
+    ) -> Dict[Type[commands.Command], Callable]:
+        print("Injecting UOW for commands")
+        return {
+            command: self._inject_uow(handler)
+            for command, handler in command_handlers.items()
+        }
+
+    def _get_injected_event_handlers(
+        self, event_handlers: Dict[Type[events.Event], list[Callable]]
+    ) -> Dict[Type[events.Event], list[Callable]]:
+        print("Injecting UOW for events")
+        return {
+            event: [self._inject_uow(handler) for handler in handlers_list]
+            for event, handlers_list in event_handlers.items()
+        }
 
     def __init__(
         self,
-        uow: _UOW,
+        uow_pool: _UOW,
         event_handlers: Dict[Type[events.Event], list[Callable]],
         command_handlers: Dict[Type[commands.Command], Callable],
         background_threads: int = 1,
@@ -52,15 +75,19 @@ to use for handling messages. Defaults to 1.
         Initialize message bus
 
         Args:
-            uow (_UOW): _description_
-            event_handlers (Dict[events.Event, list[Callable]]): _description_
-            command_handlers (Dict[commands.Command, Callable]): _description_
-            background_threads (int, optional): _description_. Defaults to 1.
+            uow_pool (_UOW): Unit of work pool
+            event_handlers (Dict[events.Event, list[Callable]]): Event handlers
+            command_handlers (Dict[commands.Command, Callable]): Command handlers
+            background_threads (int, optional): Number of background threads. Defaults to 1.
         """
 
-        self.uow: _UOW = uow
-        self.event_handlers: Dict[Type[events.Event], list[Callable]] = event_handlers
-        self.command_handlers: Dict[Type[commands.Command], Callable] = command_handlers
+        self.uow_pool: _UOW = uow_pool
+        self.event_handlers: Dict[
+            Type[events.Event], list[Callable]
+        ] = self._get_injected_event_handlers(event_handlers=event_handlers)
+        self.command_handlers: Dict[
+            Type[commands.Command], Callable
+        ] = self._get_injected_command_handlers(command_handlers=command_handlers)
         self.pool = multiprocessing.pool.ThreadPool(background_threads)
 
     def handle(self, message: Message, force_background=False) -> Any:
@@ -85,12 +112,12 @@ to use for handling messages. Defaults to 1.
 
         raise ValueError(f"{message} is not Event or Command")
 
-    def _collect_new_events(self) -> None:
+    def _collect_new_events(self, uow: AbstractUnitOfWork) -> None:
         """
         Collect all new events from all instances in the repository
         """
 
-        for event in self.uow.collect_new_events():
+        for event in uow.collect_new_events():
             self.handle(event)
 
     def _handle_with_profiling(self, message: Message) -> Any:
@@ -139,9 +166,10 @@ to use for handling messages. Defaults to 1.
         """
         handler = self.command_handlers[type(command)]
 
-        result = handler(command)
+        uow, result = handler(command)
 
-        self.pool.apply_async(self._collect_new_events)
+        if uow:
+            self.pool.apply_async(self._collect_new_events)
 
         return result
 
@@ -155,6 +183,5 @@ to use for handling messages. Defaults to 1.
         """
 
         for handler in self.event_handlers[type(event)]:
-            handler(event)
-
-        self._collect_new_events()
+            uow, _ = handler(event)
+            self._collect_new_events(uow=uow)
