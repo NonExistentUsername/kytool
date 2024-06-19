@@ -1,77 +1,14 @@
-from __future__ import annotations
-
-import abc
 import logging
 from copy import deepcopy
-from typing import TYPE_CHECKING, Dict
+from typing import Dict
 
-if TYPE_CHECKING:
-    from kytool.adapters import repository
+from kytool.adapters import repository
+from kytool.service_layer.unit_of_work.interfaces import (
+    AbstractUnitOfWork,
+    AbstractUnitOfWorkPool,
+)
 
 logger = logging.getLogger(__name__)
-
-
-class AbstractUnitOfWork(abc.ABC):
-    """
-    Abstract class for Unit of Work
-    """
-
-    def __enter__(self) -> AbstractUnitOfWork:
-        """
-        Enter Unit of Work
-
-        Returns:
-            AbstractUnitOfWork: Unit of Work
-        """
-
-        return self
-
-    def __exit__(self, *args):
-        """
-        Exit Unit of Work
-        """
-
-        self.rollback()
-
-    def commit(self):
-        """
-        Commit all changes made in this unit of work
-        """
-
-        self._commit()
-
-    @abc.abstractmethod
-    def collect_new_events(self):
-        """
-        Collects new events from the repositories.
-
-        Yields:
-            Any: The new events collected from the repositories.
-        """
-
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def _commit(self):
-        """
-        Commit all changes made in this unit of work
-
-        Raises:
-            NotImplementedError: Not implemented
-        """
-
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def rollback(self):
-        """
-        Rollback all changes made in this unit of work
-
-        Raises:
-            NotImplementedError: Not implemented
-        """
-
-        raise NotImplementedError
 
 
 class BaseRepositoriesUnitOfWork(AbstractUnitOfWork):
@@ -137,7 +74,7 @@ class InMemoryUnitOfWork(BaseRepositoriesUnitOfWork):
 
         self._last_committed = deepcopy(self.repositories)
 
-    def _commit(self):
+    def commit(self):
         """
         Commit all changes made in this unit of work
         """
@@ -154,3 +91,26 @@ class InMemoryUnitOfWork(BaseRepositoriesUnitOfWork):
         logger.debug("Rolling back changes in InMemoryUnitOfWork")
 
         self.repositories = self._last_committed
+
+
+class InMemoryUnitOfWorkPool(AbstractUnitOfWorkPool[InMemoryUnitOfWork]):
+    def __init__(self, uow: InMemoryUnitOfWork):
+        """
+        Not thread-safe Unit of Work Pool
+
+        Supposed to be used for testing purposes
+
+        Args:
+            uow (InMemoryUnitOfWork): Unit of Work
+        """
+        super().__init__()
+        self.uow = uow
+
+    def get(self) -> InMemoryUnitOfWork:
+        """
+        Get Unit of Work
+
+        Returns:
+            InMemoryUnitOfWork: Unit of Work
+        """
+        return self.uow

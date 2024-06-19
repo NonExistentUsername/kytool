@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kytool"
-version = "0.4.1"
+version = "0.5.0"
 description = "Kytool is a tool for creatng"
 authors = ["Dmytro Maior <mayor4090@gmail.com>"]
 readme = "README.md"
@@ -11,6 +11,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+decorator = "^5.1.1"
 
 [tool.isort]
 profile = "black"
