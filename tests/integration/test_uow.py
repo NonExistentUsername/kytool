@@ -32,6 +32,16 @@ def uow() -> unit_of_work.InMemoryUnitOfWork:
     )
 
 
+@pytest.fixture
+def fake_uow() -> unit_of_work.FakeUnitOfWork:
+    return unit_of_work.FakeUnitOfWork()
+
+
+@pytest.fixture
+def fake_uow_pool() -> unit_of_work.FakeUnitOfWorkPool:
+    return unit_of_work.FakeUnitOfWorkPool()
+
+
 class TestRamUOWCreation:
     def test_works(self, uow: unit_of_work.InMemoryUnitOfWork):
         with uow:
@@ -61,3 +71,30 @@ class TestRamUOWCreation:
                 raise ValueError("test")
 
         assert uow.r("users").get(id="123") is None
+
+
+class TestFakeUOW:
+    def test_works(self, fake_uow: unit_of_work.FakeUnitOfWork):
+        with fake_uow:
+            fake_uow.commit()
+
+        with fake_uow:
+            pass
+
+        with contextlib.suppress(Exception):
+            with fake_uow:
+                raise ValueError("test")
+
+    def test_pool_works(self, fake_uow_pool: unit_of_work.FakeUnitOfWorkPool):
+        with fake_uow_pool.get() as uow:
+            uow.commit()
+
+        with fake_uow_pool.get() as uow:
+            pass
+
+        with contextlib.suppress(Exception):
+            with fake_uow_pool.get() as uow:
+                raise ValueError("test")
+
+        assert fake_uow_pool.get() is not None
+        assert isinstance(fake_uow_pool.get(), unit_of_work.FakeUnitOfWork)
