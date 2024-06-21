@@ -51,10 +51,10 @@ class TestRamUOWCreation:
         assert uow.r("users").get(id="123") == SampleObject(id="123", name="test")
 
         with uow:
-            instance = uow.r("users").delete(id="123")
+            instances = uow.r("users").delete(id="123")
             uow.commit()
 
-            assert instance == SampleObject(id="123", name="test")
+            assert instances == [SampleObject(id="123", name="test")]
 
         assert uow.r("users").get(id="123") is None
 
