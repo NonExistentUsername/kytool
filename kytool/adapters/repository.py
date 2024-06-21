@@ -52,7 +52,7 @@ class AbstractRepository(abc.ABC, Generic[_T]):
 
         return instance
 
-    def delete(self, **kwargs) -> Optional[_T]:
+    def delete(self, **kwargs) -> List[_T]:
         """
         Deletes an instance from the repository based on the provided keyword arguments.
 
@@ -60,14 +60,15 @@ class AbstractRepository(abc.ABC, Generic[_T]):
             **kwargs: The keyword arguments used to identify the instance to be deleted.
 
         Returns:
-            Optional[_T]: The deleted instance, or None if no instance was found.
+            List[_T]: The deleted instance, or None if no instance was found.
         """
-        instance: Optional[_T] = self._delete(**kwargs)
+        instances: List[_T] = self._delete(**kwargs)
 
-        if instance:
-            self.seen.add(instance)
+        if instances:
+            for item in instances:
+                self.seen.add(item)
 
-        return instance
+        return instances
 
     @abc.abstractmethod
     def _add(self, instance: _T) -> None:
@@ -98,7 +99,7 @@ class AbstractRepository(abc.ABC, Generic[_T]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _delete(self, **kwargs) -> Optional[_T]:
+    def _delete(self, **kwargs) -> List[_T]:
         """
         Delete instance from repository by keyword arguments
 
@@ -106,7 +107,7 @@ class AbstractRepository(abc.ABC, Generic[_T]):
             NotImplementedError: Not implemented
 
         Returns:
-            Optional[_T]: Instance or None if not found
+            List[_T]: Instance or None if not found
         """
 
         raise NotImplementedError
@@ -193,19 +194,19 @@ for fields. Defaults to None.
 
         return None
 
-    def _delete(self, **kwargs) -> Optional[_T]:
+    def _delete(self, **kwargs) -> List[_T]:
         """
         Delete instance from repository by keyword arguments
 
         Returns:
-            Optional[_T]: Instance or None if not found
+            List[_T]: Instance or None if not found
         """
 
-        instance: Optional[_T] = self._get(**kwargs)
-
-        if instance:
+        if instance := self._get(**kwargs):
             for field in self._query_fields:
                 value = getattr(instance, field)
                 del self._storages[field][value]
 
-        return instance
+            return [instance]
+
+        return []

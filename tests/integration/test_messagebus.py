@@ -67,10 +67,10 @@ def delete_user_handler(
     command: DeleteUserCommand, uow: unit_of_work.BaseRepositoriesUnitOfWork
 ):
     with uow:
-        instance = uow.r("users").delete(id=command.user_id)
+        instances = uow.r("users").delete(id=command.user_id)
         uow.commit()
 
-        return instance
+        return instances[0] if instances else None
 
 
 @handlers.register_handler(UserCreatedEvent)
