@@ -40,16 +40,13 @@ class MessageBus(Generic[_UOW]):
             return uow, result
 
         if inspect.signature(handler).parameters.get("uow"):
-            print("Injecting UOW")
             return wrapper
         else:
-            print("Not injecting UOW")
             return lambda message: (None, handler(message))
 
     def _get_injected_command_handlers(
         self, command_handlers: Dict[Type[commands.Command], Callable]
     ) -> Dict[Type[commands.Command], Callable]:
-        print("Injecting UOW for commands")
         return {
             command: self._inject_uow(handler)
             for command, handler in command_handlers.items()
@@ -58,7 +55,6 @@ class MessageBus(Generic[_UOW]):
     def _get_injected_event_handlers(
         self, event_handlers: Dict[Type[events.Event], list[Callable]]
     ) -> Dict[Type[events.Event], list[Callable]]:
-        print("Injecting UOW for events")
         return {
             event: [self._inject_uow(handler) for handler in handlers_list]
             for event, handlers_list in event_handlers.items()
